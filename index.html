@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Электрон кундалик</title>
+  <!-- телефонга дастур қилиб ўрнатиш учун (Android ва iPhone) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e88e5">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Кундалик">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0 12px 30px;
+      background: linear-gradient(135deg, #e3f2fd, #e8f5e9);   /* оч ҳаворанг → оч яшил */
+      color: #1a237e;
+    }
+    header { text-align: center; padding: 18px 0 6px; }
+    header h1 { margin: 0; font-size: 28px; }
+    header p { margin: 4px 0 0; color: #455a64; }
+    main { max-width: 760px; margin: 0 auto; }
+
+    .karta {                                   /* оқ карточка */
+      background: white; border-radius: 16px; padding: 16px 18px; margin: 14px 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+    .karta h2 { margin: 0 0 10px; font-size: 21px; }
+    input[type=text], input[type=date] {
+      font-size: 17px; padding: 8px 10px; border: 2px solid #90caf9; border-radius: 10px;
+    }
+    button {
+      font-size: 16px; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+      border: 2px solid #1e88e5; background: #e3f2fd; color: #0d47a1;
+    }
+    button.asosiy { background: #1e88e5; color: white; }
+    button.ochir { border-color: #e53935; background: #ffebee; color: #b71c1c; padding: 4px 10px; font-size: 14px; }
+    .qator { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    /* битта одамнинг баҳолари */
+    .odam { border: 2px solid #e3f2fd; border-radius: 14px; padding: 12px; margin: 10px 0; }
+    .odam-bosh { display: flex; justify-content: space-between; align-items: center; }
+    .odam-bosh h3 { margin: 0; font-size: 19px; }
+    .toifa { display: grid; grid-template-columns: 90px 1fr 56px; gap: 8px; align-items: center; margin: 8px 0; }
+    .toifa input[type=range] { width: 100%; }
+    .foiz { font-weight: bold; font-size: 18px; text-align: right; }
+    .kunlik-ortacha { margin-top: 6px; font-weight: bold; }
+
+    /* натижалар жадвали */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #e0e0e0; }
+    th { background: #e3f2fd; }
+    td:first-child, th:first-child { text-align: left; }
+    .chiziq { height: 8px; background: #eceff1; border-radius: 4px; overflow: hidden; margin-top: 3px; }
+    .chiziq div { height: 100%; }
+    .bosh-joy { color: #78909c; font-style: italic; }
+    footer { text-align: center; color: #78909c; font-size: 13px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📒 Электрон кундалик</h1>
+    <p>🤲 Дуо · 🌸 Одоб · ⚡ Актив — ҳар куни фоизда баҳо</p>
+  </header>
+
+  <main>
+    <!-- 1) Одам қўшиш -->
+    <div class="karta">
+      <h2>👤 Одам қўшиш</h2>
+      <div class="qator">
+        <input type="text" id="yangi-ism" placeholder="Исм ёзинг">
+        <button class="asosiy" onclick="odamQoshish()">➕ Қўшиш</button>
+      </div>
+    </div>
+
+    <!-- 2) Кун танлаш ва баҳо бериш -->
+    <div class="karta">
+      <h2>📅 Баҳо бериш</h2>
+      <div class="qator">
+        <span>Кун:</span>
+        <input type="date" id="kun" onchange="chizish()">
+        <button onclick="bugunga()">Бугун</button>
+      </div>
+      <div id="baholar"></div>
+    </div>
+
+    <!-- 3) Умумий натижалар -->
+    <div class="karta">
+      <h2>📊 Умумий натижалар (ҳамма кунлар)</h2>
+      <div id="natijalar"></div>
+    </div>
+  </main>
+
+  <footer>Кундалик фақат шу қурилмада (компьютер ёки телефонда) сақланади · Ясаган: Мустафо</footer>
+
+  <script>
+    // ===== МАЪЛУМОТЛАР =====
+    // toifalar = баҳо бериладиган 3 та тоифа
+    let toifalar = [
+      { kalit: "duo",   nom: "🤲 Дуо" },
+      { kalit: "odob",  nom: "🌸 Одоб" },
+      { kalit: "aktiv", nom: "⚡ Актив" }
+    ];
+
+    // malumot = бутун кундалик битта объектда:
+    // { odamlar: ["Али", "Вали"], baholar: { "2026-11-10": { "Али": {duo:100, odob:50, aktiv:75} } } }
+    let malumot = { odamlar: [], baholar: {} };
+    try {
+      let saqlangan = localStorage.getItem("kundalik");
+      if (saqlangan) malumot = JSON.parse(saqlangan);   // JSON — матндан объектга айлантириш
+    } catch (e) {}
+
+    function saqlash() {
+      try { localStorage.setItem("kundalik", JSON.stringify(malumot)); } catch (e) {}
+    }
+
+    // ===== ЁРДАМЧИ ФУНКЦИЯЛАР =====
+    function bugungiSana() {
+      let d = new Date();
+      let oy = String(d.getMonth() + 1).padStart(2, "0");
+      let kun = String(d.getDate()).padStart(2, "0");
+      return d.getFullYear() + "-" + oy + "-" + kun;      // масалан: 2026-11-10
+    }
+
+    // фоизга қараб ранг: қизил → сариқ → яшил
+    function rang(foiz) {
+      if (foiz >= 80) return "#43a047";
+      if (foiz >= 50) return "#fbc02d";
+      return "#e53935";
+    }
+
+    // рақамлар рўйхатининг ўртачаси (бўш бўлса — null)
+    function ortacha(sonlar) {
+      if (sonlar.length === 0) return null;
+      let jami = 0;
+      sonlar.forEach(function (s) { jami = jami + s; });
+      return Math.round(jami / sonlar.length);
+    }
+
+    // HTML'да хавфсиз кўрсатиш учун (исмда < > белгилари бўлса ҳам бузилмасин)
+    function xavfsiz(matn) {
+      let div = document.createElement("div");
+      div.textContent = matn;
+      return div.innerHTML;
+    }
+
+    // ===== ОДАМ ҚЎШИШ / ЎЧИРИШ =====
+    function odamQoshish() {
+      let maydon = document.getElementById("yangi-ism");
+      let ism = maydon.value.trim();
+      if (ism === "") return;
+      if (malumot.odamlar.indexOf(ism) !== -1) { alert("Бу исм бор: " + ism); return; }
+      malumot.odamlar.push(ism);
+      maydon.value = "";
+      saqlash();
+      chizish();
+    }
+
+    function odamOchirish(ism) {
+      if (!confirm(ism + " ва унинг ҳамма баҳолари ўчирилсинми?")) return;
+      malumot.odamlar = malumot.odamlar.filter(function (o) { return o !== ism; });
+      for (let sana in malumot.baholar) delete malumot.baholar[sana][ism];
+      saqlash();
+      chizish();
+    }
+
+    // ===== БАҲО ҚЎЙИШ =====
+    function bahoQoyish(ism, kalit, foiz) {
+      let sana = document.getElementById("kun").value;
+      if (!malumot.baholar[sana]) malumot.baholar[sana] = {};
+      if (!malumot.baholar[sana][ism]) malumot.baholar[sana][ism] = {};
+      malumot.baholar[sana][ism][kalit] = Number(foiz);
+      saqlash();
+      chizish();
+    }
+
+    function bugunga() {
+      document.getElementById("kun").value = bugungiSana();
+      chizish();
+    }
+
+    // ===== ЭКРАНГА ЧИЗИШ =====
+    function chizish() {
+      let sana = document.getElementById("kun").value;
+      let joy = document.getElementById("baholar");
+
+      if (malumot.odamlar.length === 0) {
+        joy.innerHTML = '<p class="bosh-joy">Ҳали одам йўқ. Юқорида исм ёзиб «➕ Қўшиш»ни босинг.</p>';
+      } else {
+        let html = "";
+        malumot.odamlar.forEach(function (ism) {
+          let bugungi = (malumot.baholar[sana] && malumot.baholar[sana][ism]) || {};
+          let ism2 = xavfsiz(ism);
+          let ismJS = JSON.stringify(ism).replace(/"/g, "&quot;");   // onclick ичида ишлатиш учун
+          html += '<div class="odam"><div class="odam-bosh"><h3>👤 ' + ism2 + '</h3>' +
+                  '<button class="ochir" onclick="odamOchirish(' + ismJS + ')">🗑 Ўчириш</button></div>';
+          let qoyilgan = [];
+          toifalar.forEach(function (t) {
+            let bor = bugungi[t.kalit] !== undefined;
+            let qiymat = bor ? bugungi[t.kalit] : 0;
+            if (bor) qoyilgan.push(qiymat);
+            html += '<div class="toifa"><span>' + t.nom + '</span>' +
+                    '<input type="range" min="0" max="100" step="5" value="' + qiymat + '" ' +
+                    'oninput="this.parentNode.lastChild.textContent = this.value + \'%\'" ' +
+                    'onchange="bahoQoyish(' + ismJS + ', \'' + t.kalit + '\', this.value)">' +
+                    '<span class="foiz" style="color:' + (bor ? rang(qiymat) : "#b0bec5") + '">' +
+                    (bor ? qiymat + "%" : "—") + '</span></div>';
+          });
+          let o = ortacha(qoyilgan);
+          html += '<div class="kunlik-ortacha">Шу куннинг ўртачаси: ' +
+                  (o === null ? "баҳо қўйилмаган" : '<span style="color:' + rang(o) + '">' + o + '%</span>') +
+                  '</div></div>';
+        });
+        joy.innerHTML = html;
+      }
+      natijalarniChizish();
+    }
+
+    // ҳамма кунлар бўйича ўртача
+    function natijalarniChizish() {
+      let joy = document.getElementById("natijalar");
+      if (malumot.odamlar.length === 0) { joy.innerHTML = '<p class="bosh-joy">Ҳали маълумот йўқ.</p>'; return; }
+
+      let html = "<table><tr><th>Исм</th>";
+      toifalar.forEach(function (t) { html += "<th>" + t.nom + "</th>"; });
+      html += "<th>⭐ Жами</th><th>Кунлар</th></tr>";
+
+      malumot.odamlar.forEach(function (ism) {
+        let toifaSonlari = { duo: [], odob: [], aktiv: [] };
+        let hammasi = [];
+        let kunlar = 0;
+        for (let sana in malumot.baholar) {
+          let b = malumot.baholar[sana][ism];
+          if (!b) continue;
+          let bormi = false;
+          toifalar.forEach(function (t) {
+            if (b[t.kalit] !== undefined) {
+              toifaSonlari[t.kalit].push(b[t.kalit]); hammasi.push(b[t.kalit]); bormi = true;
+            }
+          });
+          if (bormi) kunlar = kunlar + 1;
+        }
+        html += "<tr><td><b>" + xavfsiz(ism) + "</b></td>";
+        toifalar.concat([{ kalit: "jami" }]).forEach(function (t) {
+          let o = ortacha(t.kalit === "jami" ? hammasi : toifaSonlari[t.kalit]);
+          if (o === null) { html += "<td>—</td>"; return; }
+          html += '<td><b style="color:' + rang(o) + '">' + o + '%</b>' +
+                  '<div class="chiziq"><div style="width:' + o + '%;background:' + rang(o) + '"></div></div></td>';
+        });
+        html += "<td>" + kunlar + "</td></tr>";
+      });
+      joy.innerHTML = html + "</table>";
+    }
+
+    // Enter босилса ҳам одам қўшилсин
+    document.getElementById("yangi-ism").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") odamQoshish();
+    });
+
+    // сайт очилганда: бугунги кунни қўйиб, ҳаммасини чизамиз
+    document.getElementById("kun").value = bugungiSana();
+    chizish();
+
+    // «ёрдамчи»ни рўйхатдан ўтказамиз (сайт интернетда https:// орқали очилганда ишлайди)
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      navigator.serviceWorker.register("sw.js");
+    }
+  </script>
+</body>
+</html>

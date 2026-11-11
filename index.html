@@ -70,7 +70,7 @@
     <div class="karta" id="kirish-oyna">
       <h2>🔐 Кириш</h2>
       <label>Логин</label>
-      <input type="text" id="kirish-email" class="toliq" placeholder="масалан: hasan.ota" autocomplete="username"
+      <input type="text" id="kirish-email" class="toliq" placeholder="масалан: hasan_kundalik" autocomplete="username"
              autocapitalize="none" autocorrect="off" spellcheck="false">
       <label>Парол</label>
       <input type="password" id="kirish-parol" class="toliq" placeholder="Паролингиз" autocomplete="current-password">
@@ -108,7 +108,7 @@
       <div class="karta">
         <h2>👤 Ўқувчи қўшиш</h2>
         <input type="text" id="yangi-ism" class="toliq" placeholder="Ўқувчининг исми">
-        <input type="text" id="yangi-otaona" class="toliq" placeholder="Ота-онасининг логини (масалан: hasan.ota)" autocapitalize="none">
+        <input type="text" id="yangi-otaona" class="toliq" placeholder="Отасининг логини (масалан: hasan_kundalik)" autocapitalize="none">
         <input type="text" id="yangi-oquvchi-email" class="toliq" placeholder="Ўқувчининг логини (ихтиёрий)" autocapitalize="none">
         <button class="asosiy" id="qoshish-tugma">➕ Қўшиш</button>
       </div>
@@ -191,13 +191,29 @@
       setTimeout(() => { x.style.display = "none"; }, 3000);
     }
     function emailTozala(e) { return (e || "").trim().toLowerCase(); }
-    // қисқа логин: «hasan.ota» ёзилса, охирига «@kundalik.test»ни ўзимиз қўшамиз
+    // ===== ҚИСҚА ЛОГИН =====
+    // «hasan_kundalik» → hasan.ota@kundalik.test (Ҳасаннинг отаси)
+    // «domla_kundalik» → domla@kundalik.test (домла)
+    // тўлиқ email ёзилса — ўзгармайди
     const DOMEN = "@kundalik.test";
+    const QOSHIMCHA = "_kundalik";
     function loginniEmailga(l) {
       const t = emailTozala(l);
-      return t.includes("@") ? t : t + DOMEN;
+      if (t.includes("@")) return t;
+      if (t.endsWith(QOSHIMCHA)) {
+        const ism = t.slice(0, -QOSHIMCHA.length);
+        return ism === "domla" ? "domla" + DOMEN : ism + ".ota" + DOMEN;
+      }
+      return t + DOMEN;
     }
-    function qisqaLogin(email) { return email.endsWith(DOMEN) ? email.slice(0, -DOMEN.length) : email; }
+    // тескариси: email'ни экранда қисқа логин қилиб кўрсатамиз
+    function qisqaLogin(email) {
+      if (!email.endsWith(DOMEN)) return email;
+      const bosh = email.slice(0, -DOMEN.length);
+      if (bosh === "domla") return "domla" + QOSHIMCHA;
+      if (bosh.endsWith(".ota")) return bosh.slice(0, -4) + QOSHIMCHA;
+      return bosh;
+    }
 
     // бир ўқувчининг баҳоларидан ўртачалар
     function hisobla(baholar) {
@@ -324,7 +340,7 @@
       try {
         await addDoc(collection(db, "oquvchilar"), {
           ism: ism,
-          // қисқа логин ёзилса ҳам бўлади (масалан: hasan.ota)
+          // қисқа логин ёзилса ҳам бўлади (масалан: hasan_kundalik)
           otaOnaEmail: $("yangi-otaona").value.trim() ? loginniEmailga($("yangi-otaona").value) : "",
           oquvchiEmail: $("yangi-oquvchi-email").value.trim() ? loginniEmailga($("yangi-oquvchi-email").value) : "",
           qoshilgan: serverTimestamp()

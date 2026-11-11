@@ -93,6 +93,10 @@
     <!-- ===== ПАРОЛНИ ЎЗГАРТИРИШ ===== -->
     <div class="karta yashirin" id="parol-oyna">
       <h2>🔑 Паролни ўзгартириш</h2>
+      <p class="kulrang yashirin" id="parol-majburiy-matn" style="font-style:normal;color:#e65100;font-weight:bold">
+        Хуш келибсиз! Биринчи кириш учун берилган паролни ўзингизнинг янги паролингизга алмаштиринг.
+        Янги паролни фақат сиз биласиз 🔐
+      </p>
       <input type="password" id="parol-eski" class="toliq" placeholder="Ҳозирги парол" autocomplete="current-password">
       <input type="password" id="parol-yangi" class="toliq" placeholder="Янги парол (камида 6 белги)" autocomplete="new-password">
       <input type="password" id="parol-yangi2" class="toliq" placeholder="Янги паролни қайта ёзинг" autocomplete="new-password">
@@ -239,7 +243,10 @@
     $("chiqish-tugma").onclick = () => signOut(auth);
 
     // ===== ПАРОЛНИ ЎЗГАРТИРИШ =====
+    let majburiy = false;              // биринчи кириш: парол ўзгармагунча бошқа ҳеч нарса кўрсатилмайди
+    let davomEt = null;                // парол ўзгаргач, давом этадиган функция
     function parolOynaniYop() {
+      if (majburiy) return;            // мажбурий пайтда ёпиб бўлмайди
       $("parol-oyna").classList.add("yashirin");
       ["parol-eski", "parol-yangi", "parol-yangi2"].forEach((id) => $(id).value = "");
       $("parol-xato").textContent = "";
@@ -255,7 +262,17 @@
         const user = auth.currentUser;
         // хавфсизлик: аввал эски парол тўғрилигини текширамиз
         await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, eski));
+        if (eski === yangi) { $("parol-xato").textContent = "Янги парол эскисидан фарқ қилсин."; return; }
         await updatePassword(user, yangi);
+        // «паролини ўзгартирди» деган белги — кейинги киришларда сўралмайди
+        await setDoc(doc(db, "parolOzgardi", emailTozala(user.email)), { vaqt: serverTimestamp() });
+        if (majburiy) {
+          majburiy = false;
+          $("parol-majburiy-matn").classList.add("yashirin");
+          $("parol-bekor").classList.remove("yashirin");
+          $("parol-ochish").classList.remove("yashirin");
+          if (davomEt) { const f = davomEt; davomEt = null; f(); }
+        }
         parolOynaniYop();
         xabar("✅ Парол ўзгартирилди");
       } catch (e) {
@@ -269,6 +286,10 @@
     // ким кирди / чиқди — Firebase ўзи хабар беради
     onAuthStateChanged(auth, async (user) => {
       tozalash.forEach((f) => f()); tozalash = [];
+      majburiy = false; davomEt = null;
+      $("parol-majburiy-matn").classList.add("yashirin");
+      $("parol-bekor").classList.remove("yashirin");
+      $("parol-ochish").classList.remove("yashirin");
       ["ustoz-oyna", "kuzatuvchi-oyna", "kim-kirdi", "parol-oyna"].forEach((id) => $(id).classList.add("yashirin"));
       if (!user) { $("kirish-oyna").classList.remove("yashirin"); return; }
 
@@ -276,6 +297,24 @@
       $("kim-kirdi").classList.remove("yashirin");
       const email = emailTozala(user.email);
 
+      // биринчи киришми? — «parolOzgardi» рўйхатида белги йўқ бўлса, аввал паролни ўзгартиради
+      let ozgargan = true;
+      try { ozgargan = (await getDoc(doc(db, "parolOzgardi", email))).exists(); } catch (e) {}
+      if (!ozgargan) {
+        majburiy = true;
+        $("kim-matn").textContent = "👋 " + qisqaLogin(email);
+        $("parol-majburiy-matn").classList.remove("yashirin");
+        $("parol-bekor").classList.add("yashirin");
+        $("parol-ochish").classList.add("yashirin");
+        $("parol-oyna").classList.remove("yashirin");
+        davomEt = () => kirgandanKeyin(user, email);
+        return;
+      }
+      kirgandanKeyin(user, email);
+    });
+
+    // парол масаласи ҳал бўлгач — устоз ёки ота ойнасини очамиз
+    async function kirgandanKeyin(user, email) {
       // устозми? — «ustozlar» рўйхатида шу email борми, текширамиз
       let ustoz = null;
       try {
@@ -290,7 +329,7 @@
         $("kim-matn").textContent = "👪 " + qisqaLogin(email);
         kuzatuvchiniBoshla(email);
       }
-    });
+    }
 
     // ===================== УСТОЗ =====================
     let oquvchilar = [];          // [{id, ism, otaOnaEmail, oquvchiEmail}]

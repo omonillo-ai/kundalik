@@ -83,7 +83,23 @@
     <!-- ким кирганини кўрсатамиз -->
     <div class="foydalanuvchi yashirin" id="kim-kirdi">
       <span id="kim-matn"></span>
-      <button class="kichik qizil" id="chiqish-tugma">Чиқиш</button>
+      <span class="qator">
+        <button class="kichik" id="parol-ochish">🔑 Парол</button>
+        <button class="kichik qizil" id="chiqish-tugma">Чиқиш</button>
+      </span>
+    </div>
+
+    <!-- ===== ПАРОЛНИ ЎЗГАРТИРИШ ===== -->
+    <div class="karta yashirin" id="parol-oyna">
+      <h2>🔑 Паролни ўзгартириш</h2>
+      <input type="password" id="parol-eski" class="toliq" placeholder="Ҳозирги парол" autocomplete="current-password">
+      <input type="password" id="parol-yangi" class="toliq" placeholder="Янги парол (камида 6 белги)" autocomplete="new-password">
+      <input type="password" id="parol-yangi2" class="toliq" placeholder="Янги паролни қайта ёзинг" autocomplete="new-password">
+      <div class="qator">
+        <button class="asosiy" id="parol-saqlash">Сақлаш</button>
+        <button id="parol-bekor">Бекор қилиш</button>
+      </div>
+      <p class="xato" id="parol-xato"></p>
     </div>
 
     <!-- ===== 2) УСТОЗ ОЙНАСИ ===== -->
@@ -125,7 +141,8 @@
   <script type="module">
     // ===== FIREBASE КУТУБХОНАЛАРИ (Google'нинг тайёр коди) =====
     import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+             EmailAuthProvider, reauthenticateWithCredential, updatePassword }
       from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection,
              query, where, onSnapshot, getDocs, serverTimestamp }
@@ -197,12 +214,38 @@
     $("kirish-parol").addEventListener("keydown", (e) => { if (e.key === "Enter") $("kirish-tugma").click(); });
     $("chiqish-tugma").onclick = () => signOut(auth);
 
+    // ===== ПАРОЛНИ ЎЗГАРТИРИШ =====
+    function parolOynaniYop() {
+      $("parol-oyna").classList.add("yashirin");
+      ["parol-eski", "parol-yangi", "parol-yangi2"].forEach((id) => $(id).value = "");
+      $("parol-xato").textContent = "";
+    }
+    $("parol-ochish").onclick = () => $("parol-oyna").classList.toggle("yashirin");
+    $("parol-bekor").onclick = parolOynaniYop;
+    $("parol-saqlash").onclick = async () => {
+      const eski = $("parol-eski").value, yangi = $("parol-yangi").value;
+      $("parol-xato").textContent = "";
+      if (yangi.length < 6) { $("parol-xato").textContent = "Янги парол камида 6 белги бўлсин."; return; }
+      if (yangi !== $("parol-yangi2").value) { $("parol-xato").textContent = "Янги пароллар бир хил эмас."; return; }
+      try {
+        const user = auth.currentUser;
+        // хавфсизлик: аввал эски парол тўғрилигини текширамиз
+        await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, eski));
+        await updatePassword(user, yangi);
+        parolOynaniYop();
+        xabar("✅ Парол ўзгартирилди");
+      } catch (e) {
+        $("parol-xato").textContent = (e.code === "auth/invalid-credential" || e.code === "auth/wrong-password")
+          ? "❌ Ҳозирги парол нотўғри." : "❌ Ўзгартириб бўлмади: " + e.code;
+      }
+    };
+
     let tozalash = [];   // «тинглаш»ларни тўхтатиш учун (чиққанда)
 
     // ким кирди / чиқди — Firebase ўзи хабар беради
     onAuthStateChanged(auth, async (user) => {
       tozalash.forEach((f) => f()); tozalash = [];
-      ["ustoz-oyna", "kuzatuvchi-oyna", "kim-kirdi"].forEach((id) => $(id).classList.add("yashirin"));
+      ["ustoz-oyna", "kuzatuvchi-oyna", "kim-kirdi", "parol-oyna"].forEach((id) => $(id).classList.add("yashirin"));
       if (!user) { $("kirish-oyna").classList.remove("yashirin"); return; }
 
       $("kirish-oyna").classList.add("yashirin");
@@ -242,6 +285,7 @@
         oquvchilar = s.docs.map((d) => ({ id: d.id, ...d.data() }))
                            .sort((a, b) => a.ism.localeCompare(b.ism));
         chizish();
+        natijalarniChizish();   // янги ўқувчи жадвалда ҳам дарров кўринсин
       }, () => xabar("❌ Ўқувчиларни ўқиб бўлмади")));
 
       tozalash.push(onSnapshot(collection(db, "baholar"), (s) => {

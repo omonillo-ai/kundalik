@@ -69,8 +69,9 @@
     <!-- ===== 1) КИРИШ ОЙНАСИ ===== -->
     <div class="karta" id="kirish-oyna">
       <h2>🔐 Кириш</h2>
-      <label>Email</label>
-      <input type="email" id="kirish-email" class="toliq" placeholder="masalan: ustoz@kundalik.uz" autocomplete="username">
+      <label>Логин</label>
+      <input type="text" id="kirish-email" class="toliq" placeholder="масалан: hasan.ota" autocomplete="username"
+             autocapitalize="none" autocorrect="off" spellcheck="false">
       <label>Парол</label>
       <input type="password" id="kirish-parol" class="toliq" placeholder="Паролингиз" autocomplete="current-password">
       <div class="qator">
@@ -107,8 +108,8 @@
       <div class="karta">
         <h2>👤 Ўқувчи қўшиш</h2>
         <input type="text" id="yangi-ism" class="toliq" placeholder="Ўқувчининг исми">
-        <input type="email" id="yangi-otaona" class="toliq" placeholder="Ота-онасининг email'и (ихтиёрий)">
-        <input type="email" id="yangi-oquvchi-email" class="toliq" placeholder="Ўқувчининг email'и (ихтиёрий)">
+        <input type="text" id="yangi-otaona" class="toliq" placeholder="Ота-онасининг логини (масалан: hasan.ota)" autocapitalize="none">
+        <input type="text" id="yangi-oquvchi-email" class="toliq" placeholder="Ўқувчининг логини (ихтиёрий)" autocapitalize="none">
         <button class="asosiy" id="qoshish-tugma">➕ Қўшиш</button>
       </div>
 
@@ -190,6 +191,13 @@
       setTimeout(() => { x.style.display = "none"; }, 3000);
     }
     function emailTozala(e) { return (e || "").trim().toLowerCase(); }
+    // қисқа логин: «hasan.ota» ёзилса, охирига «@kundalik.test»ни ўзимиз қўшамиз
+    const DOMEN = "@kundalik.test";
+    function loginniEmailga(l) {
+      const t = emailTozala(l);
+      return t.includes("@") ? t : t + DOMEN;
+    }
+    function qisqaLogin(email) { return email.endsWith(DOMEN) ? email.slice(0, -DOMEN.length) : email; }
 
     // бир ўқувчининг баҳоларидан ўртачалар
     function hisobla(baholar) {
@@ -205,10 +213,10 @@
     $("kirish-tugma").onclick = async () => {
       $("kirish-xato").textContent = "";
       try {
-        await signInWithEmailAndPassword(auth, emailTozala($("kirish-email").value), $("kirish-parol").value);
+        await signInWithEmailAndPassword(auth, loginniEmailga($("kirish-email").value), $("kirish-parol").value);
         $("kirish-parol").value = "";
       } catch (e) {
-        $("kirish-xato").textContent = "❌ Email ёки парол нотўғри. Қайта уриниб кўринг.";
+        $("kirish-xato").textContent = "❌ Логин ёки парол нотўғри. Қайта уриниб кўринг.";
       }
     };
     $("kirish-parol").addEventListener("keydown", (e) => { if (e.key === "Enter") $("kirish-tugma").click(); });
@@ -263,7 +271,7 @@
         $("kim-matn").textContent = "👩‍🏫 Устоз: " + (ustoz.ism || email);
         ustozniBoshla(email, ustoz.ism || email);
       } else {
-        $("kim-matn").textContent = "👪 " + email;
+        $("kim-matn").textContent = "👪 " + qisqaLogin(email);
         kuzatuvchiniBoshla(email);
       }
     });
@@ -316,8 +324,9 @@
       try {
         await addDoc(collection(db, "oquvchilar"), {
           ism: ism,
-          otaOnaEmail: emailTozala($("yangi-otaona").value),
-          oquvchiEmail: emailTozala($("yangi-oquvchi-email").value),
+          // қисқа логин ёзилса ҳам бўлади (масалан: hasan.ota)
+          otaOnaEmail: $("yangi-otaona").value.trim() ? loginniEmailga($("yangi-otaona").value) : "",
+          oquvchiEmail: $("yangi-oquvchi-email").value.trim() ? loginniEmailga($("yangi-oquvchi-email").value) : "",
           qoshilgan: serverTimestamp()
         });
         ["yangi-ism", "yangi-otaona", "yangi-oquvchi-email"].forEach((id) => $(id).value = "");
@@ -356,7 +365,7 @@
         const quti = document.createElement("div");
         quti.className = "odam";
         quti.innerHTML = '<div class="odam-bosh"><h3>👤 ' + xavfsiz(o.ism) + '</h3><span class="qator"></span></div>' +
-          '<div class="kulrang" style="font-size:13px">👪 ' + xavfsiz(o.otaOnaEmail || "—") + ' · 🎒 ' + xavfsiz(o.oquvchiEmail || "—") + '</div>';
+          '<div class="kulrang" style="font-size:13px">👪 ' + xavfsiz(qisqaLogin(o.otaOnaEmail || "") || "—") + ' · 🎒 ' + xavfsiz(qisqaLogin(o.oquvchiEmail || "") || "—") + '</div>';
         const tugmalar = quti.querySelector(".qator");
 
         const yubor = document.createElement("button");
